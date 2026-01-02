@@ -35,13 +35,24 @@ proguard/
 # Windows clutter
 Thumbs.db
 
+# Intellij IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
 # Log files
 *.log
+*.txt
+full_crash.txt
+crash_*.txt
+error_log.txt
+out.txt
+build_output.txt
 
-# Intellij IDEA (see https://intellij-support.jetbrains.com/entries/23393067)
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/datasources.xml
-.idea/dataSources.ids
-.idea/runConfigurations.xml
-.idea/libraries/
+# Generated files
+build/
+app/build/
+.gradle/
+local.properties
+

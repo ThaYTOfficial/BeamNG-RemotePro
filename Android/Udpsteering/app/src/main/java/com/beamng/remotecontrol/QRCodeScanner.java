@@ -1,15 +1,20 @@
 package com.beamng.remotecontrol;
 
-import android.app.Activity;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+import android.Manifest;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import com.google.zxing.Result;
+import com.google.zxing.ResultPoint;
+import com.journeyapps.barcodescanner.BarcodeCallback;
+import com.journeyapps.barcodescanner.BarcodeResult;
+import com.journeyapps.barcodescanner.DecoratedBarcodeView;
 
 import java.net.InetAddress;
 import java.net.InterfaceAddress;
@@ -18,11 +23,8 @@ import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.List;
 
-import me.dm7.barcodescanner.zxing.ZXingScannerView;
-
-public class QRCodeScanner extends Activity
-        implements ZXingScannerView.ResultHandler {
-    private ZXingScannerView mScannerView;
+public class QRCodeScanner extends AppCompatActivity {
+    private DecoratedBarcodeView barcodeView;
     private WifiManager wifiManager;
     private UdpExploreSenderFragment exploreSenderFragment;
     private ProgressDialogFragment progressDialogFragment;
@@ -30,17 +32,22 @@ public class QRCodeScanner extends Activity
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        getActionBar().setDisplayHomeAsUpEnabled(true);
-        mScannerView = new ZXingScannerView(this);   // Programmatically initialize the scanner view
-        setContentView(mScannerView);                // Set the scanner view as the content view
+        setContentView(R.layout.activity_qr_scanner); // XML tabanlı yapıya geçiyoruz
+        
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
-        // find the retained fragment on activity restarts
-        FragmentManager fm = getFragmentManager();
+        barcodeView = findViewById(R.id.barcode_scanner);
+        barcodeView.decodeContinuous(callback);
+
+        FragmentManager fm = getSupportFragmentManager();
         exploreSenderFragment = (UdpExploreSenderFragment) fm.findFragmentByTag("exploreSender");
         if (exploreSenderFragment == null) {
             exploreSenderFragment = new UdpExploreSenderFragment();
             fm.beginTransaction().add(exploreSenderFragment, "exploreSender").commit();
         }
+        
         progressDialogFragment = (ProgressDialogFragment) fm.findFragmentByTag("progressDialog");
         if (progressDialogFragment == null) {
             progressDialogFragment = new ProgressDialogFragment();
@@ -48,32 +55,39 @@ public class QRCodeScanner extends Activity
         progressDialogFragment.setListener(exploreSenderFragment);
     }
 
+    private final BarcodeCallback callback = new BarcodeCallback() {
+        @Override
+        public void barcodeResult(BarcodeResult result) {
+            if (result.getText() == null) return;
+            
+            barcodeView.pause();
+            handleScanResult(result.getText());
+        }
+
+        @Override
+        public void possibleResultPoints(List<ResultPoint> resultPoints) {}
+    };
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                // app icon in action bar clicked; goto parent activity.
-                this.finish();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        if (item.getItemId() == android.R.id.home) {
+            this.finish();
+            return true;
         }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        mScannerView = new ZXingScannerView(this);
-        setContentView(mScannerView);
-
-        mScannerView.setResultHandler(this); // Register ourselves as a handler for scan results.
-        mScannerView.startCamera(); // The camera needs to be started at least once ...
-        if (exploreSenderFragment.isRunning()) {
-            mScannerView.stopCamera(); // ... even if we stop it immediately
-        } else {
+        barcodeView.resume();
+        
+        if (!exploreSenderFragment.isRunning()) {
             if (progressDialogFragment.isShowing()) {
                 progressDialogFragment.dismiss();
             }
+        } else {
+            barcodeView.pause();
         }
     }
 
@@ -83,21 +97,19 @@ public class QRCodeScanner extends Activity
         if (!isChangingConfigurations()) {
             exploreSenderFragment.cancelTask();
         }
-        mScannerView.stopCamera(); // Stop camera on pause
+        barcodeView.pause();
     }
 
-    @Override
-    public void handleResult(Result result) {
-        String[] parts = result.getText().split("#");
+    private void handleScanResult(String rawResult) {
+        String[] parts = rawResult.split("#");
         if (parts.length != 2) {
             Toast.makeText(this, "Invalid QR code", Toast.LENGTH_LONG).show();
-            mScannerView.startCamera();
+            barcodeView.resume();
             return;
         }
         final String securityCode = parts[1];
 
-        // Check for WiFi connectivity
-        wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
 
         try {
             int ipAddress = wifiManager.getConnectionInfo().getIpAddress();
@@ -107,30 +119,26 @@ public class QRCodeScanner extends Activity
             ((RemoteControlApplication) getApplication()).setIp(ip);
 
             InetAddress broadcastAddress = getBroadcastAddress(getIpAddress());
-            //Log.i("broadcastAddress", getIpAddress().getHostAddress());
             Log.i("Broadcast Address", broadcastAddress.getHostAddress());
 
             exploreSenderFragment.execute(broadcastAddress, this, ip, securityCode);
-            FragmentTransaction ft = getFragmentManager().beginTransaction();
-            progressDialogFragment.show(ft, "progressDialog");
-        } catch(RuntimeException e) {
+            progressDialogFragment.show(getSupportFragmentManager(), "progressDialog");
+        } catch(Exception e) {
             Toast.makeText(this, "You must be connected to the same WiFi as your PC", Toast.LENGTH_LONG).show();
-            mScannerView.startCamera();
+            barcodeView.resume();
         }
     }
 
     private InetAddress getBroadcastAddress(InetAddress inetAddr) {
-        NetworkInterface temp;
-        InetAddress iAddr = null;
         try {
-            temp = NetworkInterface.getByInetAddress(inetAddr);
+            NetworkInterface temp = NetworkInterface.getByInetAddress(inetAddr);
+            if (temp == null) return null;
+            
             List<InterfaceAddress> addresses = temp.getInterfaceAddresses();
             for (InterfaceAddress inetAddress : addresses) {
                 if (inetAddress.getBroadcast() != null)
-                iAddr = inetAddress.getBroadcast();
+                    return inetAddress.getBroadcast();
             }
-            return iAddr;
-
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -138,37 +146,33 @@ public class QRCodeScanner extends Activity
     }
 
     public InetAddress getIpAddress() {
-        InetAddress inetAddress = null;
-        InetAddress myAddress = null;
-
         try {
-            for (Enumeration<NetworkInterface> networkInterface = NetworkInterface
-                    .getNetworkInterfaces(); networkInterface.hasMoreElements(); ) {
-
+            for (Enumeration<NetworkInterface> networkInterface = NetworkInterface.getNetworkInterfaces(); 
+                 networkInterface.hasMoreElements(); ) {
                 NetworkInterface singleInterface = networkInterface.nextElement();
-
-                for (Enumeration<InetAddress> IpAddresses = singleInterface.getInetAddresses(); IpAddresses
-                        .hasMoreElements(); ) {
-                    inetAddress = IpAddresses.nextElement();
-                    if (!inetAddress.isLoopbackAddress() && (singleInterface.getDisplayName()
-                            .contains("wlan0") ||
+                for (Enumeration<InetAddress> IpAddresses = singleInterface.getInetAddresses(); 
+                     IpAddresses.hasMoreElements(); ) {
+                    InetAddress inetAddress = IpAddresses.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && (singleInterface.getDisplayName().contains("wlan0") ||
                             singleInterface.getDisplayName().contains("eth0") ||
                             singleInterface.getDisplayName().contains("ap0"))) {
-                            myAddress = inetAddress;
+                        return inetAddress;
                     }
                 }
             }
-
         } catch (SocketException ex) {
+            ex.printStackTrace();
         }
-        return myAddress;
+        return null;
     }
 
     public void onError(String message) {
         if (message != null) {
             Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         }
-        progressDialogFragment.dismiss();
-        mScannerView.startCamera();
+        if (progressDialogFragment.isShowing()) {
+            progressDialogFragment.dismiss();
+        }
+        barcodeView.resume();
     }
 }

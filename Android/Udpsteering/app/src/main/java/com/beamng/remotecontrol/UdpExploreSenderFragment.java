@@ -1,11 +1,11 @@
 package com.beamng.remotecontrol;
 
-import android.app.Activity;
-import android.app.Fragment;
+import android.content.Context;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
 
 import java.net.InetAddress;
 
@@ -31,29 +31,36 @@ public class UdpExploreSenderFragment extends Fragment implements OnUdpConnected
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
-        this.scannerActivity = (QRCodeScanner)activity;
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        if (context instanceof QRCodeScanner) {
+            this.scannerActivity = (QRCodeScanner) context;
+        }
     }
-
 
     @Override
     public void onUdpConnected(InetAddress hostAddress) {
-        Intent intent = new Intent(this.scannerActivity, MainActivity.class);
-        ((RemoteControlApplication)scannerActivity.getApplication()).setHostAddress(hostAddress);
-        startActivity(intent);
+        if (scannerActivity != null) {
+            Intent intent = new Intent(this.scannerActivity, MainActivity.class);
+            ((RemoteControlApplication) scannerActivity.getApplication()).setHostAddress(hostAddress);
+            startActivity(intent);
+        }
     }
 
     @Override
     public void onError(String message) {
-        scannerActivity.onError(message);
+        if (scannerActivity != null) {
+            scannerActivity.onError(message);
+        }
     }
 
     @Override
     public void onCancel() {
         if (exploreSender != null) {
             cancelTask();
-            scannerActivity.onError(null);
+            if (scannerActivity != null) {
+                scannerActivity.onError(null);
+            }
         }
     }
 

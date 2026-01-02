@@ -1,8 +1,8 @@
 package com.beamng.remotecontrol;
 
+import androidx.appcompat.app.AppCompatActivity;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.app.Activity;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -13,7 +13,6 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.text.Layout;
 import android.content.SharedPreferences;
 import android.util.Log;
 import android.view.Display;
@@ -28,16 +27,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.widget.Switch;
+import androidx.appcompat.widget.SwitchCompat;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.CompoundButton;
 import android.widget.SeekBar;
 
-import com.beamng.remotecontrol.R;
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.common.api.GoogleApiClient;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -56,10 +51,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-public class MainActivity extends Activity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private SensorManager mSensorManager;
     public Handler mHandler;
-    private Activity aContext;
+    private AppCompatActivity aContext;
+
     private String Iadress;
     private float angle;
     private float oldangle = 0.0f;
@@ -80,7 +76,8 @@ public class MainActivity extends Activity implements SensorEventListener {
     private float brpushed;
 
     //menu items
-    private Switch unitToggle;
+    private SwitchCompat unitToggle;
+
     private int useKMH = 0;
     private SeekBar sensitivity;
     private float sensitivitySetting = 0.5f;
@@ -121,12 +118,8 @@ public class MainActivity extends Activity implements SensorEventListener {
     private int KEEP_ALIVE_TIME = 1;
     private TimeUnit KEEP_ALIVE_TIME_UNIT = TimeUnit.SECONDS;
     private int NUMBER_OF_CORES;
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    private GoogleApiClient client;
     private InetAddress hostAddress;
+
 
     public static final String prefsName = "UserSettings";
 
@@ -242,7 +235,8 @@ public class MainActivity extends Activity implements SensorEventListener {
             }
         });
 
-        unitToggle = (Switch) findViewById(R.id.unitSwitch);
+        unitToggle = (SwitchCompat) findViewById(R.id.unitSwitch);
+
         sensitivity = (SeekBar) findViewById(R.id.sensitivity);
         // Restore options preferences
         SharedPreferences settings = getSharedPreferences(prefsName, 0);
@@ -307,12 +301,8 @@ public class MainActivity extends Activity implements SensorEventListener {
         //initListeners();
 
         mHandler = new Handler();
-
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
+
 
 
     @Override
@@ -355,24 +345,8 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onStop() {
         super.onStop();
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "Main Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app deep link URI is correct.
-                Uri.parse("android-app://com.beamng.remotecontrol/http/host/path")
-        );
-        AppIndex.AppIndexApi.end(client, viewAction);
         // unregister sensor listeners to prevent the activity from draining the device's battery.
         mSensorManager.unregisterListener(this);
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.disconnect();
     }
 
     @Override
@@ -428,21 +402,6 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onStart() {
         super.onStart();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.connect();
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "Main Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app deep link URI is correct.
-                Uri.parse("android-app://com.beamng.remotecontrol/http/host/path")
-        );
-        AppIndex.AppIndexApi.start(client, viewAction);
     }
 
     class calculateFusedOrientationTask extends TimerTask {
@@ -533,10 +492,10 @@ public class MainActivity extends Activity implements SensorEventListener {
     public class UdpSessionSender extends AsyncTask<String, String, String> {
         final int PORT = 4444;
         InetAddress receiverAddress;
-        Activity aContext;
+        AppCompatActivity aContext;
         String myIadr;
 
-        public UdpSessionSender(InetAddress iadrSend, Activity activityContext, String myiadrr) {
+        public UdpSessionSender(InetAddress iadrSend, AppCompatActivity activityContext, String myiadrr) {
             this.receiverAddress = iadrSend;
             this.aContext = activityContext;
             this.myIadr = myiadrr;
@@ -589,7 +548,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     public class UdpSessionReceiver extends AsyncTask<String, String, String> {
         final int PORT = 4445;
         InetAddress receiveradress;
-        Activity aContext;
+        AppCompatActivity aContext;
         String myIadr;
         InetAddress hostAddress;
         String message;
@@ -605,7 +564,7 @@ public class MainActivity extends Activity implements SensorEventListener {
         private AnimatorSet animSet;
         DatagramSocket socket;
 
-        public UdpSessionReceiver(InetAddress iadrSend, Activity activityContext, String myiadrr) {
+        public UdpSessionReceiver(InetAddress iadrSend, AppCompatActivity activityContext, String myiadrr) {
             this.receiveradress = iadrSend;
             this.aContext = activityContext;
             this.myIadr = myiadrr;

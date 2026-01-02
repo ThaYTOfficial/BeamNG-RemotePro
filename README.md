@@ -1,15 +1,24 @@
-BeamNG.drive Remote Control
-===========================
+BeamNG.drive Remote Control (Modernized)
+=====================================
 
-Remote Control app for the PC game [BeamNG.drive](http://beamng.com/).
+Modernized fork of the official Remote Control app for the PC game [BeamNG.drive](http://beamng.com/).
 
-<a href="http://play.google.com/store/apps/details?id=com.beamng.udpsteering">
-    <img alt="Get it on Google Play"
-         src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-         height="40px" />
-</a>
+### Modernization Changes (2026)
+*   **AndroidX Migration:** Fully migrated from old Support Libraries to AndroidX.
+*   **Target SDK 34:** Updated to support Android 14.
+*   **Modern QR Scanner:** Replaced outdated ZXing library with `zxing-android-embedded`.
+*   **Gradle 8.7:** Updated build system and dependencies to latest stable versions.
+*   **Aesthetic & UI Fixes:** Improved UI handling and removed obsolete Google App Indexing code.
+
+### How to Build
+1. Clone the repository.
+2. Open the project in **Android Studio (Iguana or newer)**.
+3. Ensure you have Android SDK 34 installed.
+4. Create a `local.properties` file in `Android/Udpsteering/` with your `sdk.dir`.
+5. Run `./gradlew assembleDebug`.
 
 ![Screenshot](action.png)
+
 
 ### Communication functionality ###
 
