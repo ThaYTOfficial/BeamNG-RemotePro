@@ -110,13 +110,13 @@ public class Receivepacket {
 
         id = bb.get(92);
 
-
-
-        //Integer.reverseBytes(odometer);
+        // Parse odometer (bytes 96-99, unsigned int)
+        odometer = EndianUtils.readSwappedInteger(data, 96);
 
         bb.clear();
 
-        //Log.i("CONSTRUCTOR","flags= " + flags + " gear= "+ gear + " speed= "+speed+ " rpm= "+rpm+" engTemp= "+engTemp+" fuel= "+fuel+" odometer= "+odometer+" dashLights= "+dashLights+" showLights= "+showLights);
+        // Debug logging - uncomment to verify packet parsing
+        android.util.Log.i("Receivepacket", "speed=" + speed + " rpm=" + rpm + " gear=" + gear + " fuel=" + fuel + " engTemp=" + engTemp + " odometer=" + odometer);
 
     }
 
@@ -132,50 +132,45 @@ public class Receivepacket {
     }
 
     public boolean[] getActiveLightsArr(){
+        // Reset all lights to OFF first (fixes bug where lights never turn off)
+        for (int i = 0; i < lightsArray.length; i++) {
+            lightsArray[i] = false;
+        }
 
         if((showLights & FLAG_SHIFTLIGHT) == FLAG_SHIFTLIGHT) {
-            lightsArray[0]= true;
-            //Log.i("ACTIVELIGHTS","Shiftlight ON");
+            lightsArray[0] = true;
         }
 
         if((showLights & FLAG_FULLBEAM) == FLAG_FULLBEAM) {
-            lightsArray[1]= true;
-            //Log.i("ACTIVELIGHTS","Fullbeam ON");
+            lightsArray[1] = true;
         }
 
         if((showLights & FLAG_HANDBREAK) == FLAG_HANDBREAK){
-            lightsArray[2]= true;
-            //Log.i("ACTIVELIGHTS","Handbreak ON");
+            lightsArray[2] = true;
         }
 
         if((showLights & FLAG_SIGNAL_L) == FLAG_SIGNAL_L) {
-            lightsArray[5]= true;
-            //Log.i("ACTIVELIGHTS","Left Signal ON");
+            lightsArray[5] = true;
         }
 
         if((showLights & FLAG_SIGNAL_R) == FLAG_SIGNAL_R) {
-            lightsArray[6]= true;
-            //Log.i("ACTIVELIGHTS","Right Signal ON");
+            lightsArray[6] = true;
         }
 
         if((showLights & FLAG_SIGNAL_ANY) == FLAG_SIGNAL_ANY) {
-            lightsArray[7]= true;
-            //Log.i("ACTIVELIGHTS","Any Signal ON");
+            lightsArray[7] = true;
         }
 
         if((showLights & FLAG_OILWARN) == FLAG_OILWARN) {
-            lightsArray[8]= true;
-            //Log.i("ACTIVELIGHTS","Oilwarn ON");
+            lightsArray[8] = true;
         }
 
         if((showLights & FLAG_BATTERY) == FLAG_BATTERY) {
-            lightsArray[9]= true;
-            //Log.i("ACTIVELIGHTS","Battery ON");
+            lightsArray[9] = true;
         }
 
         if((showLights & FLAG_ABS) == FLAG_ABS) {
-            lightsArray[10]= true;
-            //Log.i("ACTIVELIGHTS","ABS ON");
+            lightsArray[10] = true;
         }
 
         return lightsArray;
@@ -227,7 +222,7 @@ public class Receivepacket {
         return fuel;
     }
 
-    public int getOdometer() { return 500; }
+    public int getOdometer() { return odometer; }
 
     public int getID() { return id; }
 }

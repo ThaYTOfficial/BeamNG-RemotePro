@@ -640,7 +640,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             int newSpeed = Math.round(2.23694f * packet.getSpeed());
             if (useKMH == 1)
                 newSpeed =  Math.round(1.60934f*newSpeed);
-            //Log.i("Speed ", "set to: " + packet.getSpeed());
+            Log.i("HUD", "Speed: " + newSpeed + " RPM: " + packet.getRPM() + " Gear: " + packet.getGear());
             int barSpeed = Math.round(newSpeed*0.56f);
             animation1 = ObjectAnimator.ofInt(pbSpeed, "progress", oldSpeed, barSpeed);
             oldSpeed = barSpeed;
