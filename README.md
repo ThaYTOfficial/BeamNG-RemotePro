@@ -1,8 +1,7 @@
-# 🏎️ BeamNG.drive RemotePro (Ultra Edition)
+# BeamNG.drive RemotePro
 
 [![Android](https://img.shields.io/badge/Android-Target%2034-green.svg)](https://developer.android.com/about/versions/14)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Ultra%20Responsive-orange.svg)](#features)
 
 A high-performance, pro-tuned evolution of the official BeamNG.drive Remote Control. This version is built for the most immersive driving experience possible, featuring advanced physics-based haptics and zero-lag sensor fusion.
 
@@ -11,7 +10,7 @@ A high-performance, pro-tuned evolution of the official BeamNG.drive Remote Cont
 ## 📜 The Heritage
 This project has a long history of evolution:
 1.  **The Original (2016):** Created by **BeamNG GmbH** as a simple controller. Later abandoned.
-2.  **The Modernization:** Forked by a community developer to update the codebase to AndroidX and modern SDKs.
+2.  **The Modernization:** Forked by **umutsevimcann** to update the codebase to AndroidX and modern SDKs.
 3.  **The Pro Edition (Current):** Further forked and heavily overhauled by **ThaYTOfficial**. This version introduced the **Complementary Filter** steering, **Tiered Crash Haptics**, and the **Ultra-Low Latency HUD**.
 
 ---
@@ -69,12 +68,13 @@ The biggest change in the **Pro Edition** is the move away from standard Android
 2. Scroll to **OutGauge Support**.
 3. **Enable OutGauge**: ✅
 4. **IP**: Enter the IP displayed on your phone's welcome screen.
-5. **Port**: `4445` (default).
+5. **Port**: `4444` (unified).
 
 ---
 
 ## 📡 Technical Documentation (OutGauge Protocol)
 
+The app accepts specialized UDP packets on port **4444** with the following structure:
 | Offset | Type | Name | Description |
 | :--- | :--- | :--- | :--- |
 | 0-3 | unsigned | `time` | Timestamp (ms) |

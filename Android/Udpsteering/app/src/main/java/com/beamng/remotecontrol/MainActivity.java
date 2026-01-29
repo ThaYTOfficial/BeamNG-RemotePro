@@ -678,7 +678,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     public class UdpSessionReceiver extends AsyncTask<String, String, String> {
-        final int PORT = 4445;
+        final int PORT = 4444;
         InetAddress receiveradress;
         AppCompatActivity aContext;
         String myIadr;

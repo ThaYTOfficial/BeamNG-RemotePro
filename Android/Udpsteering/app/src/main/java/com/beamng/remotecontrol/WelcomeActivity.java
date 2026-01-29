@@ -53,9 +53,9 @@ public class WelcomeActivity extends AppCompatActivity {
         android.widget.TextView ipInfo = (android.widget.TextView) findViewById(R.id.ipAddressInfo);
         String ip = getDeviceIpAddress();
         if (ip != null) {
-            ipInfo.setText("Set IP in Game to: " + ip);
+            ipInfo.setText(ip);
         } else {
-            ipInfo.setText("Set IP in Game to: 255.255.255.255");
+            ipInfo.setText("No Network");
         }
     }
 
