@@ -75,6 +75,7 @@ class PSReceivedData
         (data as NSData).getBytes(&display1, range: NSMakeRange(60, 16));
         (data as NSData).getBytes(&display2, range: NSMakeRange(76, 16));
         (data as NSData).getBytes(&rid, range: NSMakeRange(92, 4));
+        (data as NSData).getBytes(&odometer, range: NSMakeRange(96, 4));
         }
     }
     var timer : UInt32 = 0;
@@ -97,6 +98,7 @@ class PSReceivedData
     var display1 = [UInt8](repeating: 0, count: 16);
     var display2 = [UInt8](repeating: 0, count: 16);
     var rid : Int = 0;
+    var odometer : UInt32 = 0;
 }
 
 class PSSession : NSObject, AsyncUdpSocketDelegate
@@ -224,6 +226,7 @@ class PSSession : NSObject, AsyncUdpSocketDelegate
         carData.gear = Int(recData.gear);
         carData.fuel = recData.fuel;
         carData.temperature = recData.engineTemperature;
+        carData.distance = Int(recData.odometer);
         //print(recData.showLights);
         carData.lights = recData.showLights;
         //print(carData.lights);

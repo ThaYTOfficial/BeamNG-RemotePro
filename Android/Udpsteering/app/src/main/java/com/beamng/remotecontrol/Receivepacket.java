@@ -16,10 +16,10 @@ public class Receivepacket {
     private float engTemp;
     private float fuel;
     private int odometer;
-    private short dashLights;
+    private int dashLights;
     private int id;
     private boolean[] dasharray = new boolean[11];
-    private short showLights;
+    private int showLights;
     private final short FLAG_SHIFTLIGHT = 1;
     private final short FLAG_FULLBEAM = 2;
     private final short FLAG_HANDBREAK = 16;
@@ -104,11 +104,11 @@ public class Receivepacket {
 
         fuel = EndianUtils.readSwappedFloat(data, 28);
 
-        dashLights = EndianUtils.readSwappedShort(data, 40);
+        dashLights = EndianUtils.readSwappedInteger(data, 40);
 
-        showLights = EndianUtils.readSwappedShort(data, 44);
+        showLights = EndianUtils.readSwappedInteger(data, 44);
 
-        id = bb.get(92);
+        id = EndianUtils.readSwappedInteger(data, 92);
 
         // Parse odometer (bytes 96-99, unsigned int)
         odometer = EndianUtils.readSwappedInteger(data, 96);
