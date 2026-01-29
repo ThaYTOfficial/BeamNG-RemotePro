@@ -66,8 +66,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     //Sensordata damping elements
     private List<Float> rollingAverage = new ArrayList<Float>();
-    private static final int MAX_SAMPLE_SIZE = 5;
+    private static final int MAX_SAMPLE_SIZE = 10; // Increased from 5 for smoother output
     private float gravity;
+    
+    // Complementary filter variables
+    private float gyroAngle = 0f;
+    private long lastGyroTimestamp = 0;
+    private static final float FILTER_COEFFICIENT = 0.98f; // 98% gyro, 2% accelerometer
 
     //UI Elements
     private Button throttle;
@@ -79,13 +84,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private SwitchCompat unitToggle;
 
     private int useKMH = 0;
+    private int use360Steering = 0;
     private SeekBar sensitivity;
     private float sensitivitySetting = 0.5f;
     private ImageButton menu;
     private LinearLayout menuItems;
-
+    
+    // Haptic Feedback Variables
+    private android.os.Vibrator vibrator;
+    private SwitchCompat hapticSwitch;
+    private int useHaptic = 0;
+    private long lastVib = 0;
+    private float lastSpeedMs = 0;
+    private String lastGear = "";
+    
     //Views depending on communication
     private RelativeLayout mainLayout;
+    private SwitchCompat steering360Switch;
     private ProgressBar pbSpeed;
     private ProgressBar pbRspeed;
     private ProgressBar pbFuel;
@@ -139,6 +154,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         SharedPreferences.Editor editor = settings.edit();
         editor.putInt("unit", useKMH);
         editor.putFloat("sens", sensitivitySetting);
+        editor.putInt("steering360", use360Steering);
+        editor.putInt("haptic", useHaptic);
         // Commit the edits!
         editor.commit();
 
@@ -248,6 +265,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             textUnit.setText("Km/h");
         }
 
+        steering360Switch = (SwitchCompat) findViewById(R.id.steering360Switch);
+        use360Steering = settings.getInt("steering360", 0);
+        if (use360Steering == 1) {
+            steering360Switch.setChecked(true);
+        }
+
+        steering360Switch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    use360Steering = 1;
+                } else {
+                    use360Steering = 0;
+                }
+                SaveSettings();
+            }
+        });
+
         unitToggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
@@ -277,6 +312,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         });
         menuItems = (LinearLayout)  findViewById(R.id.menuItems);
+
+        // Haptic Feedback Initialization
+        vibrator = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        hapticSwitch = (SwitchCompat) findViewById(R.id.hapticSwitch);
+        useHaptic = settings.getInt("haptic", 0);
+        if (useHaptic == 1) {
+            hapticSwitch.setChecked(true);
+        }
+        hapticSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    useHaptic = 1;
+                    // Test vibration to confirm haptics work
+                    doVibrate(300, 255);
+                    Log.i("Haptic", "Haptic Feedback ENABLED - test vibration triggered");
+                } else {
+                    useHaptic = 0;
+                    Log.i("Haptic", "Haptic Feedback DISABLED");
+                }
+                SaveSettings();
+            }
+        });
+
         menu = (ImageButton) findViewById(R.id.menuButton);
         menu.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -305,42 +364,62 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
 
+
     @Override
     public void onSensorChanged(SensorEvent event) {
         switch (event.sensor.getType()) {
             case Sensor.TYPE_ACCELEROMETER:
+                // Calculate absolute tilt from gravity in landscape
+                // Held sideways, gravity is primarily on the X-axis (short edge)
+                // rotating it like a wheel moves gravity to the Y-axis.
+                float accelAngle = (float) (Math.atan2(event.values[0], event.values[1]) * 180 / Math.PI);
+                
+                // Offset so centered landscape is 0
+                // In Rotation 90 (Left), Y is left, X is up. Center is y=0, x=9.8 -> atan2(9.8, 0) = 90.
+                // In Rotation 270 (Right), Y is right, X is down. Center is y=0, x=-9.8 -> atan2(-9.8, 0) = -90.
+                accelAngle = accelAngle - (90.0f * orientationhandler);
 
-                angle = (float) (Math.asin(
-                    -event.values[1] / Math.sqrt(
-                        event.values[0] * event.values[0] +
-                        event.values[1] * event.values[1] +
-                        event.values[2] * event.values[2]
-                    )
-                ) * 180 / Math.PI);
-
-                rollingAverage = roll(rollingAverage, event.values[1]);
-                gravity = averageList(rollingAverage);
-
+                // Complementary filter: 90% Gyro (very fast), 10% Accel (stable)
+                // A lower gyro weight (0.90) makes it snap to center faster.
+                if (use360Steering == 1) {
+                    float diff = accelAngle - angle;
+                    while (diff < -180) diff += 360;
+                    while (diff > 180) diff -= 360;
+                    angle = angle + (1.0f - 0.90f) * diff;
+                    while (angle < -180) angle += 360;
+                    while (angle > 180) angle -= 360;
+                } else {
+                    angle = 0.90f * angle + (1.0f - 0.90f) * accelAngle;
+                }
+                
+                gravity = angle; 
                 break;
 
-            // Check for orientation-change sensor event
+            case Sensor.TYPE_GYROSCOPE:
+                if (lastGyroTimestamp != 0) {
+                    float dt = (event.timestamp - lastGyroTimestamp) / 1000000000.0f;
+                    // Screen Z-axis rotation is the one for "steering wheel" motion
+                    float rotationRate = event.values[2] * 180f / (float) Math.PI;
+                    // Sign should be corrected based on orientation
+                    angle -= rotationRate * dt * orientationhandler; 
+                }
+                lastGyroTimestamp = event.timestamp;
+                break;
+
             case Sensor.TYPE_ROTATION_VECTOR:
                 orientation = display.getRotation();
                 switch (orientation) {
                     case Surface.ROTATION_90:
-                        if (orientationhandler != 1) {
-                            orientationhandler = 1;
-                        }
+                        orientationhandler = 1;
                         break;
                     case Surface.ROTATION_270:
-                        if (orientationhandler != -1) {
-                            orientationhandler = -1;
-                        }
+                        orientationhandler = -1;
                         break;
                 }
                 break;
         }
     }
+
 
     @Override
     public void onStop() {
@@ -368,12 +447,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
     }
 
-    // This function registers sensor listeners for the accelerometer
+    // Registers sensor listeners for Accelerometer and Gyroscope
     public void initListeners() {
         mSensorManager.registerListener(this,
                 mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
                 SensorManager.SENSOR_DELAY_GAME);
 
+        mSensorManager.registerListener(this,
+                mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE),
+                SensorManager.SENSOR_DELAY_GAME);
+
+        // Keep rotation vector only for display rotation checks (low rate)
         mSensorManager.registerListener(this,
                 mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR),
                 SensorManager.SENSOR_DELAY_NORMAL);
@@ -382,15 +466,37 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void updateOrientationDisplay() {
         //angle damped via the average of the last 5 sensordata entries
         //with Boundaries -60 to +60°:
-        //float uiAngle =Math.min(Math.max((float) (gravity * -7.9 * orientationhandler), -60f),60f);
-        float uiAngle = (float) (gravity * -7.9 * orientationhandler);
+        float uiAngle;
+        if (use360Steering == 1) {
+            uiAngle = gravity * orientationhandler;
+        } else {
+            // Original logic used -7.9 multiplier on raw acceleration values
+            // Since gravity now stores damped angle, we map it back or just use angle.
+            // But to keep old feel exactly same in 90 mode:
+            uiAngle = (float) (gravity * orientationhandler);
+        }
+        
+        // Calculate shortest rotation path
+        float targetAngle = -uiAngle;
+        float diff = targetAngle - oldangle;
+        // Normalize difference to -180 to +180
+        while (diff < -180) diff += 360;
+        while (diff > 180) diff -= 360;
+        targetAngle = oldangle + diff;
+
         //animation of the whole mainLayout when UI is updated every 50ms
-        oban = ObjectAnimator.ofFloat(mainLayout, "rotation", oldangle, uiAngle);
+        oban = ObjectAnimator.ofFloat(mainLayout, "rotation", oldangle, targetAngle);
         oban.setDuration(50);
         oban.setInterpolator(new LinearInterpolator());
         oban.start();
 
-        oldangle = uiAngle;
+        oldangle = targetAngle; // Keep accumulating to avoid jumps, or reset if needed? 
+        // Better to reset oldangle to normalized version periodically or just keep it winding?
+        // Actually, mainLayout.setRotation() wraps visually, but properties might wind up.
+        // For standard setRotation, 361 == 1. So it's safe to let it wind or normalize.
+        // If we want to keep numbers small:
+        while (oldangle > 180) oldangle -= 360;
+        while (oldangle < -180) oldangle += 360;
     }
 
     private Runnable updateOrientationDisplayTask = new Runnable() {
@@ -430,6 +536,28 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         total = total / tallyUp.size();
 
         return total;
+    }
+
+    // Circular average for angles (handles wrap-around at +/-180 correctly)
+    public float circularAverageList(List<Float> angles) {
+        if (angles.isEmpty()) return 0f;
+        double sumSin = 0, sumCos = 0;
+        for (float a : angles) {
+            sumSin += Math.sin(Math.toRadians(a));
+            sumCos += Math.cos(Math.toRadians(a));
+        }
+        return (float) Math.toDegrees(Math.atan2(sumSin / angles.size(), sumCos / angles.size()));
+    }
+
+    // Helper for haptic vibration with API level compatibility
+    @SuppressWarnings("deprecation")
+    private void doVibrate(long milliseconds, int amplitude) {
+        if (vibrator == null || !vibrator.hasVibrator()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(android.os.VibrationEffect.createOneShot(milliseconds, amplitude));
+        } else {
+            vibrator.vibrate(milliseconds);
+        }
     }
 
     private void hideSystemUI() {
@@ -515,7 +643,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             e.printStackTrace();
                         }
                         //Log.i("Sensitivity", ": " + sensitivitySetting);
-                        sendpacket.setSteeringAngle(Math.min(Math.max((angle *sensitivitySetting * orientationhandler) / 75, -0.5f), 0.5f) + 0.5f);
+                        float steeringLimit = (use360Steering == 1) ? 180f : 75f;
+                        // Use the smoothed 'gravity' value instead of raw 'angle' to prevent snap-back
+                        // Clamp at ±179 to prevent wrap-around at the ±180 boundary
+                        float clampedAngle = Math.max(-179f, Math.min(179f, gravity));
+                        sendpacket.setSteeringAngle(Math.min(Math.max((clampedAngle * sensitivitySetting * orientationhandler) / steeringLimit, -0.5f), 0.5f) + 0.5f);
                         sendpacket.setThrottle(thrpushed);
                         sendpacket.setBreaks(brpushed);
                         sendpacket.setID(pID);
@@ -638,32 +770,91 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             //convert m/s to mp/h
             int newSpeed = Math.round(2.23694f * packet.getSpeed());
+            
+            // HAPTIC FEEDBACK LOGIC
+            // Calculate acceleration (G-Force approximation)
+            // Delta Speed / Delta Time (approx, we rely on packet interval ~50ms)
+            // EXPANDED HAPTIC FEEDBACK ENGINE
+            float currentSpeedMs = packet.getSpeed();
+            float deltaSpeed = Math.abs(currentSpeedMs - lastSpeedMs);
+            lastSpeedMs = currentSpeedMs;
+            
+            String currentGear = packet.getGear();
+            float currentBrake = packet.getBrake();
+            float currentRPM = packet.getRPM();
+            long now = System.currentTimeMillis();
+            
+            if (MainActivity.this.useHaptic == 1 && MainActivity.this.vibrator != null) {
+                // 1. Crash Detection (Tiered)
+                if (deltaSpeed > 6.0f && now - MainActivity.this.lastVib > 500) { 
+                    // SEVERE CRASH
+                    MainActivity.this.doVibrate(600, 255);
+                    MainActivity.this.lastVib = now; 
+                } else if (deltaSpeed > 3.0f && now - MainActivity.this.lastVib > 400) {
+                    // MEDIUM IMPACT
+                    MainActivity.this.doVibrate(300, 180);
+                    MainActivity.this.lastVib = now;
+                } else if (deltaSpeed > 1.2f && now - MainActivity.this.lastVib > 300) {
+                    // MINOR BUMP / SCRAPE
+                    MainActivity.this.doVibrate(150, 100);
+                    MainActivity.this.lastVib = now;
+                }
+                
+                // 2. Gear Shift Detection
+                else if (currentGear != null && !currentGear.equals(MainActivity.this.lastGear) && now - MainActivity.this.lastVib > 200) {
+                     MainActivity.this.doVibrate(60, 160); 
+                     MainActivity.this.lastVib = now;
+                }
+
+                // 3. Braking Feel (Simulated ABS/Lockup)
+                // If braking hard (> 85%), give a low frequency hum
+                else if (currentBrake > 0.85f && now - MainActivity.this.lastVib > 100) {
+                    MainActivity.this.doVibrate(40, 60);
+                    MainActivity.this.lastVib = now;
+                }
+
+                // 4. Engine Stall Shudder
+                // If engine is about to die (RPM < 450) and car is in gear
+                else if (currentRPM < 450 && currentRPM > 50 && !currentGear.equals("N") && now - MainActivity.this.lastVib > 150) {
+                    MainActivity.this.doVibrate(80, 50);
+                    MainActivity.this.lastVib = now;
+                }
+            }
+            MainActivity.this.lastGear = currentGear;
+
+
             if (useKMH == 1)
                 newSpeed =  Math.round(1.60934f*newSpeed);
-            Log.i("HUD", "Speed: " + newSpeed + " RPM: " + packet.getRPM() + " Gear: " + packet.getGear());
-            int barSpeed = Math.round(newSpeed*0.56f);
+            
+            // HUD Scaling tuned for visual arcs on the background sprite
+            // Total progress 200 = 360 degrees.
+            
+            // Speedo: Arc is ~250 deg. 200 * (250/360) = 138 limit. 220 MPH -> 138. multiplier = 0.63
+            int barSpeed = Math.max(0, Math.min(138, Math.round(newSpeed * 0.63f))); 
             animation1 = ObjectAnimator.ofInt(pbSpeed, "progress", oldSpeed, barSpeed);
             oldSpeed = barSpeed;
 
-            int newRPM = Math.round(0.0155f * packet.getRPM());
-            //Log.i("RPM ", "set to: " + packet.getRPM());
+            // RPM: Arc is ~280 deg. 200 * (280/360) = 155 limit. 8000 RPM -> 155. multiplier = 0.019
+            int newRPM = Math.max(0, Math.min(155, Math.round(packet.getRPM() * 0.019f))); 
             animation2 = ObjectAnimator.ofInt(pbRspeed, "progress", oldRPM, newRPM);
             oldRPM = newRPM;
 
-            int newEngTemp = Math.round(42 * packet.getEngineTemp());
-            //Log.i("Engtemp ", "set to: " + packet.getEngineTemp());
+            // Temp: Arc is ~80 deg. 200 * (80/360) = 44 limit.
+            // Tuning so 90C (Normal) is center: 44/2 = 22. Multiplier = 0.24
+            int newEngTemp = Math.max(0, Math.min(44, Math.round(packet.getEngineTemp() * 0.24f))); 
             animation3 = ObjectAnimator.ofInt(pbHeat, "progress", oldEngTemp, newEngTemp);
             oldEngTemp = newEngTemp;
 
-            int newFuel = Math.round(42 * packet.getFuel());
-            //Log.i("Fuel", "set to: " + packet.getFuel());
+            // Fuel: Arc is ~80 deg. 200 * (80/360) = 44 limit.
+            // 1.0 (Full) should be 44. Multiplier = 44
+            int newFuel = Math.max(0, Math.min(44, Math.round(packet.getFuel() * 44f))); 
             animation4 = ObjectAnimator.ofInt(pbFuel, "progress", oldFuel, newFuel);
             oldFuel = newFuel;
 
             animSet = new AnimatorSet();
             animSet.playTogether(animation1, animation2, animation3, animation4);
             animSet.setInterpolator(new LinearInterpolator());
-            animSet.setDuration(500);
+            animSet.setDuration(120); 
             animSet.start();
 
             textSpeed.setText(String.format("%03d", newSpeed));

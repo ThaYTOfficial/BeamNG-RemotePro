@@ -60,10 +60,8 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
     var rBlinker : UIImage! = nil;
     var rBlinkerView : UIImageView! = nil;
     
-    var senSlider : UISlider! = nil;
-    var unitSel : UISwitch! = nil;
-    var senText : UILabel! = nil;
-    var unitText : UILabel! = nil;
+    var steering360Sel : UISwitch! = nil;
+    var steering360Text : UILabel! = nil;
     var menuBG : UIImageView! = nil;
     
     var startScreen : UIImage! = nil;
@@ -322,6 +320,23 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
             labelUnit.text = "MPH";
         }
         
+        self.steering360Sel = UISwitch();
+        self.steering360Sel.frame = CGRect(x: 20.0, y: 15.0, width: 150, height: 20);
+        self.steering360Sel.onTintColor = UIColor.white;
+        self.steering360Sel.addTarget(self, action: #selector(PSSessionViewController.Steering360Switch), for: UIControlEvents.valueChanged);
+        self.view.addSubview(steering360Sel);
+        
+        self.steering360Sel.isOn = defaults.bool(forKey: "Steering360");
+        
+        self.steering360Text = UILabel();
+        self.steering360Text.frame = CGRect(x: 80.0, y: 20.0, width: 150, height: 20);
+        self.steering360Text.text = "360° Steering";
+        self.steering360Text.textColor = UIColor.white;
+        self.view.addSubview(steering360Text);
+        
+        self.steering360Sel.isHidden = true;
+        self.steering360Text.isHidden = true;
+        
         //qr scanner stuff
         
         // Get an instance of the AVCaptureDevice class to initialize a device object and provide the video
@@ -428,27 +443,34 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
             let upVec : PSVector = PSVector(x: 0, y: 1, z: 0);
             
             //keep value locked when going past 90 degrees (previous implementation had it going up to 90 and then back down as you past it)
-            if(self.interfaceOrientation == UIInterfaceOrientation.landscapeLeft)
-            {
-                if (gravity.x > 0) {
-                    angle = acos(gravity.dot(upVec));
-                
-                    angle -= M_PI_2;
-                    angle *= -1;
-                    angle += M_PI_2;
-                
-                    let angleDeg : Double = angle * 180.0 / 3.145;
-                
-                    translatedAngle = angleDeg - 135.0;
+            if (self.steering360Sel.isOn) {
+                angle = atan2(-gravity.y, gravity.x);
+                // Map to degrees
+                let angleDeg : Double = angle * 180.0 / 3.145;
+                translatedAngle = angleDeg;
+            } else {
+                if(self.interfaceOrientation == UIInterfaceOrientation.landscapeLeft)
+                {
+                    if (gravity.x > 0) {
+                        angle = acos(gravity.dot(upVec));
+                    
+                        angle -= M_PI_2;
+                        angle *= -1;
+                        angle += M_PI_2;
+                    
+                        let angleDeg : Double = angle * 180.0 / 3.145;
+                    
+                        translatedAngle = angleDeg - 135.0;
+                    }
+                    
                 }
-                
-            }
-            else {
-                if (gravity.x < 0) {
-                    angle = acos(gravity.dot(upVec));
-                    let angleDeg : Double = angle * 180.0 / 3.145;
-                
-                    translatedAngle = angleDeg - 135.0;
+                else {
+                    if (gravity.x < 0) {
+                        angle = acos(gravity.dot(upVec));
+                        let angleDeg : Double = angle * 180.0 / 3.145;
+                    
+                        translatedAngle = angleDeg - 135.0;
+                    }
                 }
             }
             
@@ -463,7 +485,8 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
                 //print("get steer angle");
                 //self.session.currentData.steer = round(Float(translatedAngle / 90.0) * -1.0);
                 //print(self.senSlider.value);
-                var steerVal : Float = ((Float(translatedAngle / 90.0) * -1.0)-0.5)*self.senSlider.value+0.5;
+                let steerLimit : Float = self.steering360Sel.isOn ? 180.0 : 90.0;
+                var steerVal : Float = ((Float(translatedAngle / Double(steerLimit)) * -1.0)-0.5)*self.senSlider.value+0.5;
                 if (steerVal > 1) {
                     steerVal = 1;
                 }
@@ -477,7 +500,8 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
             
             let animDuration : Double = 0.07;
             UIView.animate(withDuration: animDuration, animations: { () -> Void in
-                self.hudView.transform = CGAffineTransform(rotationAngle: CGFloat(-(self.angle - (90.0 / (180.0 / 3.145))))).concatenating(CGAffineTransform(scaleX: 1.0, y: 1.0));
+                let displayAngle = self.steering360Sel.isOn ? self.angle : (self.angle - (90.0 / (180.0 / 3.145)))
+                self.hudView.transform = CGAffineTransform(rotationAngle: CGFloat(-displayAngle)).concatenating(CGAffineTransform(scaleX: 1.0, y: 1.0));
                 
                 if(self.session != nil) {
                     
@@ -756,6 +780,10 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
         defaults.set(unitSel.isOn, forKey: "UnitSetting");
 
     }
+    func Steering360Switch () {
+        let defaults = UserDefaults.standard;
+        defaults.set(steering360Sel.isOn, forKey: "Steering360");
+    }
     func onButtonMenu () {
         if (!unitText.isHidden) {
             //connectionButton.isHidden = true;
@@ -763,6 +791,8 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
             unitSel.isHidden = true;
             senSlider.isHidden = true;
             senText.isHidden = true;
+            steering360Sel.isHidden = true;
+            steering360Text.isHidden = true;
             menuBG.isHidden = true;
         }
         else {
@@ -773,6 +803,8 @@ class PSSessionViewController : UIViewController, AVCaptureMetadataOutputObjects
             unitSel.isHidden = false;
             senSlider.isHidden = false;
             senText.isHidden = false;
+            steering360Sel.isHidden = false;
+            steering360Text.isHidden = false;
             menuBG.isHidden = false;
         }
     }

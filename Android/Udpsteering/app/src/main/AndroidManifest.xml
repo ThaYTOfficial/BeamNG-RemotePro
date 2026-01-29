@@ -11,6 +11,7 @@
     <uses-feature
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".RemoteControlApplication"
@@ -37,7 +38,7 @@
 
         <activity 
             android:name=".MainActivity"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|keyboardHidden|screenSize" />
     </application>
 

@@ -13,8 +13,10 @@ public class Receivepacket {
     private String gearStr;
     private float speed;
     private float rpm;
-    private float engTemp;
+    private float EngTemp;
     private float fuel;
+    private float throttle;
+    private float brake;
     private int odometer;
     private int dashLights;
     private int id;
@@ -100,9 +102,13 @@ public class Receivepacket {
 
         rpm = EndianUtils.readSwappedFloat(data, 16);
 
-        engTemp = EndianUtils.readSwappedFloat(data, 24);
+        EngTemp = EndianUtils.readSwappedFloat(data, 24);
 
         fuel = EndianUtils.readSwappedFloat(data, 28);
+
+        throttle = EndianUtils.readSwappedFloat(data, 48);
+
+        brake = EndianUtils.readSwappedFloat(data, 52);
 
         dashLights = EndianUtils.readSwappedInteger(data, 40);
 
@@ -116,7 +122,7 @@ public class Receivepacket {
         bb.clear();
 
         // Debug logging - uncomment to verify packet parsing
-        android.util.Log.i("Receivepacket", "speed=" + speed + " rpm=" + rpm + " gear=" + gear + " fuel=" + fuel + " engTemp=" + engTemp + " odometer=" + odometer);
+        android.util.Log.i("Receivepacket", "speed=" + speed + " rpm=" + rpm + " gear=" + gear + " fuel=" + fuel + " engTemp=" + EngTemp + " odometer=" + odometer);
 
     }
 
@@ -202,6 +208,21 @@ public class Receivepacket {
             case 7:
                 gearStr = "6";
                 break;
+            case 8:
+                gearStr = "7";
+                break;
+            case 9:
+                gearStr = "8";
+                break;
+            case 10:
+                gearStr = "9";
+                break;
+            case 11:
+                gearStr = "10";
+                break;
+            default:
+                gearStr = "?";
+                break;
         }
         return gearStr;
     }
@@ -215,12 +236,16 @@ public class Receivepacket {
     }
 
     public float getEngineTemp(){
-        return engTemp;
+        return EngTemp;
     }
 
     public float getFuel(){
         return fuel;
     }
+
+    public float getThrottle() { return throttle; }
+
+    public float getBrake() { return brake; }
 
     public int getOdometer() { return odometer; }
 
