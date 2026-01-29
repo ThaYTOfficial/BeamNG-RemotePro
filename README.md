@@ -91,9 +91,7 @@ The biggest change in the **Pro Edition** is the move away from standard Android
 
 ## 📜 Credits & License
 - Original App (2016) by **BeamNG GmbH**.
-- Heritage Modernization by the open-source community.
+- Heritage Modernization by the **umutsevimcann**.
 - Pro Tuning & Expansion by **ThaYTOfficial**.
 - Licensed under the **MIT License**.
 
----
-*Driven to perfection. 🚦*
