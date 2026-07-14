@@ -1,0 +1,65 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build BeamNG SteeringDevice IPA
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install xcpretty
+        run: gem install xcpretty
+
+      - name: Build app (unsigned)
+        working-directory: iOS/BeamNG.SteeringDevice
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "BeamNG.SteeringDevice.xcodeproj" \
+            -target "BeamNG.SteeringDevice" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "${{ github.workspace }}/DerivedData" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            | xcpretty || true
+
+      - name: Package IPA
+        run: |
+          APP_PATH=$(find "${{ github.workspace }}/DerivedData" -name "BeamNG.SteeringDevice.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Built .app not found"
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          mkdir -p "${{ github.workspace }}/Payload"
+          cp -R "$APP_PATH" "${{ github.workspace }}/Payload/"
+          cd "${{ github.workspace }}"
+          zip -r "BeamNG.SteeringDevice.ipa" "Payload"
+          ls -lh "BeamNG.SteeringDevice.ipa"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeamNG-SteeringDevice-IPA
+          path: ${{ github.workspace }}/BeamNG.SteeringDevice.ipa
+          if-no-files-found: error
